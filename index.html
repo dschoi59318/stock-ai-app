@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 주식 분석</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Pretendard:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #1e2d45;
+    --accent: #3b82f6;
+    --accent2: #06b6d4;
+    --green: #10b981;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'DM Mono', monospace;
+    --sans: 'Pretendard', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* 배경 그리드 효과 */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* 헤더 */
+  header {
+    margin-bottom: 2.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+
+  .logo-dot {
+    width: 8px; height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 12px var(--accent);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .logo-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #f1f5f9;
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 4px;
+    font-weight: 300;
+  }
+
+  /* API 키 입력 */
+  .api-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .api-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent2);
+    white-space: nowrap;
+    letter-spacing: 0.05em;
+  }
+
+  .api-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+
+  .api-input::placeholder { color: var(--muted); }
+
+  /* 탭 */
+  .tab-bar {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 1.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px;
+  }
+
+  .tab {
+    flex: 1;
+    padding: 9px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    background: transparent;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.2s;
+    font-family: var(--sans);
+  }
+
+  .tab.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 0 20px rgba(59,130,246,0.3);
+  }
+
+  /* 패널 */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* 폼 요소 */
+  .form-section { margin-bottom: 1.25rem; }
+
+  .form-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  /* 태그 선택 */
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  .tag {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    cursor: pointer;
+    color: var(--muted);
+    background: var(--surface);
+    transition: all 0.15s;
+    font-family: var(--sans);
+  }
+
+  .tag:hover { border-color: var(--accent); color: var(--text); }
+
+  .tag.on {
+    background: rgba(59,130,246,0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* 그리드 select */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  select, input[type=text] {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 13px;
+    padding: 10px 14px;
+    outline: none;
+    font-family: var(--sans);
+    transition: border-color 0.15s;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  select:focus, input[type=text]:focus {
+    border-color: var(--accent);
+  }
+
+  input[type=text]::placeholder { color: var(--muted); }
+
+  /* 실행 버튼 */
+  .run-btn {
+    width: 100%;
+    padding: 13px;
+    margin-top: 4px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: var(--sans);
+    letter-spacing: 0.01em;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .run-btn:hover { background: #2563eb; box-shadow: 0 0 30px rgba(59,130,246,0.4); }
+  .run-btn:active { transform: scale(0.99); }
+  .run-btn:disabled { background: var(--surface2); color: var(--muted); cursor: not-allowed; box-shadow: none; }
+
+  /* 결과 박스 */
+  .result-wrap {
+    margin-top: 1.5rem;
+    display: none;
+  }
+
+  .result-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .result-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--green);
+    background: rgba(16,185,129,0.1);
+    border: 1px solid rgba(16,185,129,0.3);
+    padding: 3px 10px;
+    border-radius: 100px;
+    letter-spacing: 0.1em;
+  }
+
+  .result-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    font-size: 14px;
+    line-height: 1.85;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+    min-height: 60px;
+  }
+
+  .result-box.loading {
+    color: var(--muted);
+    font-style: italic;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+
+  .result-box.error {
+    color: var(--red);
+    border-color: rgba(239,68,68,0.3);
+    background: rgba(239,68,68,0.05);
+  }
+
+  /* 액션 버튼 그룹 */
+  .action-btns {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    margin-bottom: 6px;
+  }
+
+  .act-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    cursor: pointer;
+    font-family: var(--sans);
+    transition: all 0.15s;
+  }
+
+  .act-btn:hover { border-color: var(--accent); color: var(--text); }
+
+  .act-btn.copied {
+    border-color: var(--green);
+    color: var(--green);
+    background: rgba(16,185,129,0.08);
+  }
+
+  .act-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+  /* 면책 */
+  .disclaimer {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 10px;
+    line-height: 1.6;
+    padding: 10px 14px;
+    background: rgba(245,158,11,0.06);
+    border: 1px solid rgba(245,158,11,0.15);
+    border-radius: 8px;
+  }
+
+  /* 스크롤바 */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="header-top">
+      <div class="logo-dot"></div>
+      <span class="logo-tag">AI Stock Analyzer</span>
+    </div>
+    <h1>AI 주식 분석</h1>
+    <p class="subtitle">Claude AI가 투자 성향에 맞는 종목을 추천하고 매수/매도 판단을 도와줍니다</p>
+  </header>
+
+  <!-- API 키 입력 -->
+  <div class="api-box">
+    <span class="api-label">API_KEY</span>
+    <input class="api-input" type="password" id="apiKey" placeholder="sk-ant-api... 입력">
+  </div>
+
+  <!-- 탭 -->
+  <div class="tab-bar">
+    <button class="tab active" onclick="switchTab('recommend')">조건 입력 → 종목 추천</button>
+    <button class="tab" onclick="switchTab('analyze')">종목 입력 → 매수/매도 판단</button>
+  </div>
+
+  <!-- 탭 1: 종목 추천 -->
+  <div class="panel active" id="panel-recommend">
+
+    <div class="form-section">
+      <label class="form-label">투자 성향</label>
+      <div class="tags" id="style-tags">
+        <button class="tag on" onclick="solo(this,'style-tags')">안정형</button>
+        <button class="tag" onclick="solo(this,'style-tags')">성장형</button>
+        <button class="tag" onclick="solo(this,'style-tags')">배당형</button>
+        <button class="tag" onclick="solo(this,'style-tags')">공격형</button>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <label class="form-label">선호 섹터 (복수 선택)</label>
+      <div class="tags" id="sector-tags">
+        <button class="tag" onclick="multi(this)">반도체</button>
+        <button class="tag" onclick="multi(this)">바이오</button>
+        <button class="tag" onclick="multi(this)">2차전지</button>
+        <button class="tag" onclick="multi(this)">IT/플랫폼</button>
+        <button class="tag" onclick="multi(this)">금융</button>
+        <button class="tag" onclick="multi(this)">에너지</button>
+        <button class="tag" onclick="multi(this)">소비재</button>
+        <button class="tag on" onclick="multi(this)">제한 없음</button>
+      </div>
+    </div>
+
+    <div class="form-section grid2">
+      <div>
+        <label class="form-label">투자 기간</label>
+        <select id="r-period">
+          <option>단기 (1개월 이내)</option>
+          <option>중기 (3~6개월)</option>
+          <option selected>장기 (1년 이상)</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">투자 시장</label>
+        <select id="r-market">
+          <option selected>국내 (코스피/코스닥)</option>
+          <option>미국 (나스닥/NYSE)</option>
+          <option>국내+미국 혼합</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <label class="form-label">추가 조건 (선택)</label>
+      <input type="text" id="r-extra" placeholder="예: 배당 3% 이상, 시총 1조 이상, PER 15 이하">
+    </div>
+
+    <button class="run-btn" id="btn-r" onclick="runRecommend()">AI 종목 추천 받기</button>
+
+    <div class="result-wrap" id="wrap-r">
+      <div class="result-header">
+        <span class="result-tag">ANALYSIS COMPLETE</span>
+      </div>
+      <div class="result-box" id="box-r"></div>
+      <div class="action-btns">
+        <button class="act-btn" id="copy-r" onclick="copyResult('r')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          결과 복사
+        </button>
+        <button class="act-btn" onclick="savePDF('r', '종목추천')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          PDF 저장
+        </button>
+      </div>
+      <p class="disclaimer">⚠️ 본 분석은 AI가 생성한 정보이며 투자 권유가 아닙니다. 최종 투자 결정은 본인 책임입니다.</p>
+    </div>
+  </div>
+
+  <!-- 탭 2: 매수/매도 판단 -->
+  <div class="panel" id="panel-analyze">
+
+    <div class="form-section">
+      <label class="form-label">종목명 또는 티커</label>
+      <input type="text" id="a-stock" placeholder="예: 삼성전자, 005930, NVDA, AAPL">
+    </div>
+
+    <div class="form-section">
+      <label class="form-label">분석 관점</label>
+      <div class="tags" id="view-tags">
+        <button class="tag on" onclick="solo(this,'view-tags')">종합 분석</button>
+        <button class="tag" onclick="solo(this,'view-tags')">기본적 분석</button>
+        <button class="tag" onclick="solo(this,'view-tags')">기술적 분석</button>
+        <button class="tag" onclick="solo(this,'view-tags')">리스크 분석</button>
+      </div>
+    </div>
+
+    <div class="form-section grid2">
+      <div>
+        <label class="form-label">보유 여부</label>
+        <select id="a-hold">
+          <option>미보유 (신규 매수 검토)</option>
+          <option>보유 중 (추가 매수 검토)</option>
+          <option>보유 중 (매도 검토)</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">투자 기간</label>
+        <select id="a-period">
+          <option>단기</option>
+          <option selected>중기</option>
+          <option>장기</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="run-btn" id="btn-a" onclick="runAnalyze()">AI 매수/매도 판단 받기</button>
+
+    <div class="result-wrap" id="wrap-a">
+      <div class="result-header">
+        <span class="result-tag">ANALYSIS COMPLETE</span>
+      </div>
+      <div class="result-box" id="box-a"></div>
+      <div class="action-btns">
+        <button class="act-btn" id="copy-a" onclick="copyResult('a')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          결과 복사
+        </button>
+        <button class="act-btn" onclick="savePDF('a', '매수매도판단')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          PDF 저장
+        </button>
+      </div>
+      <p class="disclaimer">⚠️ 본 분석은 AI가 생성한 정보이며 투자 권유가 아닙니다. 최종 투자 결정은 본인 책임입니다.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // 탭 전환
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach((t, i) =>
+      t.classList.toggle('active', (i===0&&name==='recommend')||(i===1&&name==='analyze'))
+    );
+    document.getElementById('panel-recommend').classList.toggle('active', name==='recommend');
+    document.getElementById('panel-analyze').classList.toggle('active', name==='analyze');
+  }
+
+  // 단일 선택 태그
+  function solo(el, groupId) {
+    document.querySelectorAll(`#${groupId} .tag`).forEach(t => t.classList.remove('on'));
+    el.classList.add('on');
+  }
+
+  // 복수 선택 태그
+  function multi(el) { el.classList.toggle('on'); }
+
+  // 선택된 태그 텍스트 가져오기
+  function getSelected(id) {
+    return [...document.querySelectorAll(`#${id} .tag.on`)].map(t => t.textContent).join(', ');
+  }
+
+  // Claude API 호출
+  async function callClaude(prompt) {
+    const apiKey = document.getElementById('apiKey').value.trim();
+    if (!apiKey) throw new Error('API 키를 입력해주세요.');
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-allow-browser': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1000,
+        system: `당신은 주식 분석 전문가입니다. 한국어로 답변하세요.
+분석 결과 형식:
+[요약] 핵심 결론 1~2줄
+[추천/판단] 종목명 또는 매수/매도/홀드
+[근거 1] 설명
+[근거 2] 설명
+[근거 3] 설명
+[주의사항] 리스크 1~2가지
+⚠️ 투자 결정은 본인 책임입니다.`,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'API 오류');
+    }
+
+    const data = await res.json();
+    return data.content?.[0]?.text || '응답 없음';
+  }
+
+  // 종목 추천 실행
+  async function runRecommend() {
+    const style   = getSelected('style-tags');
+    const sector  = getSelected('sector-tags');
+    const period  = document.getElementById('r-period').value;
+    const market  = document.getElementById('r-market').value;
+    const extra   = document.getElementById('r-extra').value;
+
+    const prompt = `다음 조건에 맞는 주식 종목을 3~5개 추천해주세요.
+- 투자 성향: ${style}
+- 선호 섹터: ${sector || '제한 없음'}
+- 투자 기간: ${period}
+- 투자 시장: ${market}
+${extra ? `- 추가 조건: ${extra}` : ''}
+각 종목마다 종목명, 추천 이유, 리스크를 포함하세요.`;
+
+    await run('r', prompt, 'AI가 종목을 분석하고 있습니다...', 'AI 종목 추천 받기');
+  }
+
+  // 매수/매도 판단 실행
+  async function runAnalyze() {
+    const stock  = document.getElementById('a-stock').value.trim();
+    if (!stock) { alert('종목명을 입력해주세요.'); return; }
+
+    const view   = getSelected('view-tags');
+    const hold   = document.getElementById('a-hold').value;
+    const period = document.getElementById('a-period').value;
+
+    const prompt = `${stock} 종목을 ${view} 관점으로 분석해주세요.
+- 현재 상황: ${hold}
+- 투자 기간: ${period}
+매수/매도/홀드 판단을 명확히 제시하고 근거를 설명해주세요.`;
+
+    await run('a', prompt, `${stock} 종목을 분석하고 있습니다...`, 'AI 매수/매도 판단 받기');
+  }
+
+  // 결과 복사
+  function copyResult(id) {
+    const text = document.getElementById(`box-${id}`).textContent;
+    if (!text || text.includes('분석하고 있습니다')) return;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById(`copy-${id}`);
+      btn.classList.add('copied');
+      btn.querySelector('svg').outerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="20 6 9 17 4 12"/></svg>';
+      btn.childNodes[btn.childNodes.length - 1].textContent = ' 복사됨!';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> 결과 복사`;
+      }, 2000);
+    });
+  }
+
+  // PDF 저장
+  function savePDF(id, label) {
+    const text = document.getElementById(`box-${id}`).textContent;
+    if (!text || text.includes('분석하고 있습니다')) return;
+
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+    const html = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>AI 주식 분석 - ${label}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Noto Sans KR', sans-serif; background: #fff; color: #1e293b; padding: 40px; line-height: 1.8; }
+  .header { border-bottom: 2px solid #3b82f6; padding-bottom: 16px; margin-bottom: 24px; }
+  .header h1 { font-size: 22px; font-weight: 700; color: #1e3a5f; }
+  .header .meta { font-size: 12px; color: #64748b; margin-top: 4px; }
+  .content { font-size: 14px; white-space: pre-wrap; word-break: break-word; }
+  .footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; }
+  @media print { body { padding: 20px; } }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>AI 주식 분석 — ${label}</h1>
+  <div class="meta">분석 일시: ${dateStr} ${timeStr} &nbsp;|&nbsp; Powered by Claude AI</div>
+</div>
+<div class="content">${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+<div class="footer">⚠️ 본 분석은 AI가 생성한 정보이며 투자 권유가 아닙니다. 최종 투자 결정은 본인 책임입니다.</div>
+<script>window.onload = () => { window.print(); }<\/script>
+</body></html>`;
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url  = URL.createObjectURL(blob);
+    const win  = window.open(url, '_blank');
+    if (!win) alert('팝업이 차단됐어요! 브라우저에서 팝업 허용 후 다시 시도하세요.');
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+
+  // 공통 실행
+  async function run(id, prompt, loadingMsg, btnLabel) {
+    const btn  = document.getElementById(`btn-${id}`);
+    const wrap = document.getElementById(`wrap-${id}`);
+    const box  = document.getElementById(`box-${id}`);
+
+    btn.disabled = true;
+    btn.textContent = '분석 중...';
+    wrap.style.display = 'block';
+    box.className = 'result-box loading';
+    box.textContent = loadingMsg;
+
+    try {
+      const result = await callClaude(prompt);
+      box.className = 'result-box';
+      box.textContent = result;
+    } catch(e) {
+      box.className = 'result-box error';
+      box.textContent = '오류: ' + e.message;
+    }
+
+    btn.disabled = false;
+    btn.textContent = btnLabel;
+  }
+</script>
+</body>
+</html>
