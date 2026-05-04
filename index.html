@@ -368,9 +368,14 @@
   </header>
 
   <!-- API 키 입력 -->
-  <div class="api-box">
+  <div class="api-box" id="api-box">
     <span class="api-label">API_KEY</span>
-    <input class="api-input" type="password" id="apiKey" placeholder="sk-ant-api... 입력">
+    <input class="api-input" type="password" id="apiKey" placeholder="sk-ant-api... 입력 후 저장">
+    <button onclick="saveKey()" id="btn-save" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;white-space:nowrap;">저장</button>
+    <button onclick="clearKey()" id="btn-clear" style="display:none;background:transparent;color:#64748b;border:1px solid #1e2d45;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;white-space:nowrap;">삭제</button>
+  </div>
+  <div id="key-status" style="font-size:12px;color:#10b981;margin-bottom:1rem;padding-left:4px;display:none;">
+    ✅ API 키 저장됨 — 다음 방문 시 자동 로드됩니다
   </div>
 
   <!-- 탭 -->
@@ -512,6 +517,34 @@
 </div>
 
 <script>
+  // API 키 저장/불러오기
+  window.onload = function() {
+    const saved = localStorage.getItem('anthropic_api_key');
+    if (saved) {
+      document.getElementById('apiKey').value = saved;
+      document.getElementById('key-status').style.display = 'block';
+      document.getElementById('btn-save').style.display = 'none';
+      document.getElementById('btn-clear').style.display = 'inline-block';
+    }
+  };
+
+  function saveKey() {
+    const key = document.getElementById('apiKey').value.trim();
+    if (!key.startsWith('sk-ant-')) { alert('올바른 API 키를 입력해주세요. (sk-ant-로 시작)'); return; }
+    localStorage.setItem('anthropic_api_key', key);
+    document.getElementById('key-status').style.display = 'block';
+    document.getElementById('btn-save').style.display = 'none';
+    document.getElementById('btn-clear').style.display = 'inline-block';
+  }
+
+  function clearKey() {
+    localStorage.removeItem('anthropic_api_key');
+    document.getElementById('apiKey').value = '';
+    document.getElementById('key-status').style.display = 'none';
+    document.getElementById('btn-save').style.display = 'inline-block';
+    document.getElementById('btn-clear').style.display = 'none';
+  }
+
   // 탭 전환
   function switchTab(name) {
     document.querySelectorAll('.tab').forEach((t, i) =>
@@ -537,8 +570,9 @@
 
   // Claude API 호출
   async function callClaude(prompt) {
-    const apiKey = document.getElementById('apiKey').value.trim();
-    if (!apiKey) throw new Error('API 키를 입력해주세요.');
+    const apiKey = document.getElementById('apiKey').value.trim()
+                || localStorage.getItem('anthropic_api_key') || '';
+    if (!apiKey) throw new Error('API 키를 입력하고 저장 버튼을 눌러주세요.');
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
