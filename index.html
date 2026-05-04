@@ -367,16 +367,7 @@
     <p class="subtitle">Claude AI가 투자 성향에 맞는 종목을 추천하고 매수/매도 판단을 도와줍니다</p>
   </header>
 
-  <!-- API 키 입력 -->
-  <div class="api-box" id="api-box">
-    <span class="api-label">API_KEY</span>
-    <input class="api-input" type="password" id="apiKey" placeholder="sk-ant-api... 입력 후 저장">
-    <button onclick="saveKey()" id="btn-save" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;white-space:nowrap;">저장</button>
-    <button onclick="clearKey()" id="btn-clear" style="display:none;background:transparent;color:#64748b;border:1px solid #1e2d45;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;white-space:nowrap;">삭제</button>
-  </div>
-  <div id="key-status" style="font-size:12px;color:#10b981;margin-bottom:1rem;padding-left:4px;display:none;">
-    ✅ API 키 저장됨 — 다음 방문 시 자동 로드됩니다
-  </div>
+  <!-- API 키 불필요 - Worker에서 처리 -->
 
   <!-- 탭 -->
   <div class="tab-bar">
@@ -568,23 +559,14 @@
     return [...document.querySelectorAll(`#${id} .tag.on`)].map(t => t.textContent).join(', ');
   }
 
-  // Claude API 호출
-  async function callClaude(prompt) {
-    const apiKey = document.getElementById('apiKey').value.trim()
-                || localStorage.getItem('anthropic_api_key') || '';
-    if (!apiKey) throw new Error('API 키를 입력하고 저장 버튼을 눌러주세요.');
+  // Claude API 호출 (Worker 프록시 경유)
+  const WORKER_URL = 'https://stock-ai-proxy.dschoi59318.workers.dev';
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+  async function callClaude(prompt) {
+    const res = await fetch(WORKER_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-allow-browser': 'true'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1000,
         system: `당신은 주식 분석 전문가입니다. 한국어로 답변하세요.
 분석 결과 형식:
 [요약] 핵심 결론 1~2줄
