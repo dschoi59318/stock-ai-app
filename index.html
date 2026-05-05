@@ -344,6 +344,47 @@
 
   .act-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
 
+  /* 실시간 뉴스 섹션 */
+  .news-section {
+    margin-top: 1rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    display: none;
+  }
+  .news-head {
+    padding: 8px 14px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .news-item {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .news-item:last-child { border-bottom: none; }
+  .news-title { color: var(--text); margin-bottom: 2px; }
+  .news-meta { font-size: 11px; color: var(--muted); }
+
+  /* 데이터 소스 칩 */
+  .source-chips {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    margin-top: 8px; display: none;
+  }
+  .src-chip {
+    font-size: 10px; padding: 3px 8px; border-radius: 20px;
+    border: 1px solid var(--border); color: var(--muted);
+    font-family: var(--mono); transition: all 0.2s;
+  }
+  .src-chip.active { border-color: #378ADD; color: #378ADD; }
+  .src-chip.done { border-color: var(--green); color: var(--green); }
+
   /* 면책 */
   .disclaimer {
     font-size: 11px;
@@ -497,6 +538,15 @@
       <div class="result-header">
         <span class="result-tag">ANALYSIS COMPLETE</span>
       </div>
+      <div class="source-chips" id="source-chips-a">
+        <span class="src-chip" id="chip-news-a">📰 Naver 뉴스</span>
+        <span class="src-chip" id="chip-web-a">📊 실시간 주가</span>
+        <span class="src-chip" id="chip-ai-a">🤖 Claude AI</span>
+      </div>
+      <div class="news-section" id="news-a">
+        <div class="news-head">📰 실시간 관련 뉴스</div>
+        <div id="news-list-a"></div>
+      </div>
       <div class="result-box" id="box-a"></div>
       <div class="action-btns">
         <button class="act-btn" id="copy-a" onclick="copyResult('a')">
@@ -620,12 +670,83 @@ ${extra ? `- 추가 조건: ${extra}` : ''}
     const hold   = document.getElementById('a-hold').value;
     const period = document.getElementById('a-period').value;
 
-    const prompt = `${stock} 종목을 ${view} 관점으로 분석해주세요.
+    const btn   = document.getElementById('btn-a');
+    const wrap  = document.getElementById('wrap-a');
+    const box   = document.getElementById('box-a');
+    const chips = document.getElementById('source-chips-a');
+    const newsSection = document.getElementById('news-a');
+
+    btn.disabled = true;
+    btn.textContent = '분석 중...';
+    wrap.style.display = 'block';
+    chips.style.display = 'flex';
+    newsSection.style.display = 'none';
+    box.className = 'result-box loading';
+    box.textContent = `${stock} 뉴스 + 주가 + AI 분석 중... (30초 내외 소요)`;
+    ['news','web','ai'].forEach(k => {
+      document.getElementById(`chip-${k}-a`).className = 'src-chip active';
+    });
+
+    try {
+      const prompt = `${stock} 종목을 ${view} 관점으로 분석해주세요.
 - 현재 상황: ${hold}
 - 투자 기간: ${period}
 매수/매도/홀드 판단을 명확히 제시하고 근거를 설명해주세요.`;
 
-    await run('a', prompt, `${stock} 종목을 분석하고 있습니다...`, 'AI 매수/매도 판단 받기', stock, 'analyze');
+      // Worker v2에 한 번에 요청 (Worker가 뉴스+주가+분석 모두 처리)
+      const res = await fetch(WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stockName: stock,
+          mode: 'analyze',
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+
+      if (!res.ok) throw new Error(`Worker 오류: ${res.status}`);
+      const data = await res.json();
+
+      // 뉴스 표시
+      const news = data.news || [];
+      if (news.length > 0) {
+        document.getElementById('news-list-a').innerHTML = news.map(n => `
+          <div class="news-item">
+            <div class="news-title">${n.title}</div>
+            ${n.desc ? `<div class="news-meta">${n.desc}</div>` : ''}
+          </div>`).join('');
+        newsSection.style.display = 'block';
+      }
+
+      // 칩 완료 표시
+      ['news','web','ai'].forEach(k => {
+        document.getElementById(`chip-${k}-a`).className = 'src-chip done';
+      });
+
+      // Worker v2 응답 구조 처리
+      let text = '응답 없음';
+      if (data.content && Array.isArray(data.content)) {
+        text = data.content.filter(c => c.type === 'text').map(c => c.text).join('') || '응답 없음';
+      } else if (data.text) {
+        text = data.text;
+      } else if (data.error) {
+        throw new Error(data.error);
+      }
+      const hasReal = data.hasRealData || (data.news && data.news.length > 0);
+      const badge = hasReal
+        ? '<div style="font-size:11px;color:var(--green);margin-bottom:8px;font-family:var(--mono);">📊 실시간 뉴스 + 주가 데이터 반영</div>'
+        : '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-family:var(--mono);">📚 AI 학습 데이터 기반 분석</div>';
+
+      box.className = 'result-box';
+      box.innerHTML = badge + '<pre style="white-space:pre-wrap;font-family:inherit;margin:0;">' + text + '</pre>';
+
+    } catch(e) {
+      box.className = 'result-box error';
+      box.textContent = '오류: ' + e.message;
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'AI 매수/매도 판단 받기';
   }
 
   // 결과 복사
