@@ -566,23 +566,16 @@
     return [...document.querySelectorAll(`#${id} .tag.on`)].map(t => t.textContent).join(', ');
   }
 
-  // Claude API 호출 (Worker 프록시 경유)
+  // Claude API 호출 (Worker 프록시 + DART 연동)
   const WORKER_URL = 'https://stock-ai-proxy.dschoi59318.workers.dev';
 
-  async function callClaude(prompt) {
+  async function callClaude(prompt, stockName = '', mode = 'recommend') {
     const res = await fetch(WORKER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        system: `당신은 주식 분석 전문가입니다. 한국어로 답변하세요.
-분석 결과 형식:
-[요약] 핵심 결론 1~2줄
-[추천/판단] 종목명 또는 매수/매도/홀드
-[근거 1] 설명
-[근거 2] 설명
-[근거 3] 설명
-[주의사항] 리스크 1~2가지
-⚠️ 투자 결정은 본인 책임입니다.`,
+        stockName,
+        mode,
         messages: [{ role: 'user', content: prompt }]
       })
     });
@@ -593,7 +586,10 @@
     }
 
     const data = await res.json();
-    return data.content?.[0]?.text || '응답 없음';
+    return {
+      text: data.content?.[0]?.text || '응답 없음',
+      dartUsed: data.dartUsed || false
+    };
   }
 
   // 종목 추천 실행
