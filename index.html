@@ -650,38 +650,28 @@
       dropdown.classList.add('open');
 
       try {
-        // DART API로 종목 검색
+        // Worker GET 엔드포인트로 종목 검색 (CORS 우회)
         const res = await fetch(
-          `https://opendart.fss.or.kr/api/company.json?crtfc_key=9990b7d8e15e4291eb86783c4fb01630e7223cee&corp_name=${encodeURIComponent(query)}&page_no=1&page_count=10`
+          `${WORKER_URL}?search=${encodeURIComponent(query)}`
         );
-        const data = await res.json();
+        const listed = await res.json();
 
-        if (!data.list || data.list.length === 0) {
-          dropdown.innerHTML = '<div class="searching-indicator">검색 결과 없음</div>';
+        if (!listed || listed.length === 0) {
+          dropdown.innerHTML = '<div class="searching-indicator">검색 결과 없음 — 다른 이름으로 시도해보세요</div>';
           return;
         }
 
-        // 상장사만 필터링 (stock_code 있는 것)
-        const listed = data.list.filter(c => c.stock_code && c.stock_code.trim());
-
-        if (listed.length === 0) {
-          dropdown.innerHTML = '<div class="searching-indicator">상장된 종목 없음</div>';
-          return;
-        }
-
-        dropdown.innerHTML = listed.slice(0, 8).map(corp => {
-          const market = corp.corp_cls === 'Y' ? '코스피' : corp.corp_cls === 'K' ? '코스닥' : '기타';
-          const code = corp.stock_code.trim();
-          return `<div class="stock-item" onclick="selectStock('${corp.corp_name}', '${code}', '${market}')">
-            <span class="stock-item-name">${corp.corp_name}</span>
-            <span class="stock-item-code">${code}</span>
-            <span class="stock-item-market">${market}</span>
-          </div>`;
-        }).join('');
+        dropdown.innerHTML = listed.map(corp =>
+          `<div class="stock-item" onclick="selectStock('${corp.name}', '${corp.code}', '${corp.market}')">
+            <span class="stock-item-name">${corp.name}</span>
+            <span class="stock-item-code">${corp.code}</span>
+            <span class="stock-item-market">${corp.market}</span>
+          </div>`
+        ).join('');
 
         dropdown.classList.add('open');
       } catch(e) {
-        dropdown.innerHTML = '<div class="searching-indicator">검색 실패 — 종목코드 직접 입력해보세요</div>';
+        dropdown.innerHTML = '<div class="searching-indicator">검색 실패 — 잠시 후 다시 시도해보세요</div>';
       }
     }, 300);
   }
