@@ -630,7 +630,7 @@ ${extra ? `- 추가 조건: ${extra}` : ''}
 
   // 결과 복사
   function copyResult(id) {
-    const text = document.getElementById(`box-${id}`).textContent;
+    const text = document.getElementById(`box-${id}`).innerText;
     if (!text || text.includes('분석하고 있습니다')) return;
     navigator.clipboard.writeText(text).then(() => {
       const btn = document.getElementById(`copy-${id}`);
