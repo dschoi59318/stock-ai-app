@@ -344,6 +344,49 @@
 
   .act-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
 
+  /* 종목 자동검색 드롭다운 */
+  .stock-wrap { position: relative; }
+  .stock-dropdown {
+    position: absolute;
+    top: 100%; left: 0; right: 0;
+    background: #111827;
+    border: 1px solid #3b82f6;
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    z-index: 100;
+    max-height: 220px;
+    overflow-y: auto;
+    display: none;
+  }
+  .stock-dropdown.open { display: block; }
+  .stock-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid #1e2d45;
+    transition: background 0.1s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .stock-item:last-child { border-bottom: none; }
+  .stock-item:hover { background: #1a2235; }
+  .stock-item-name { font-size: 14px; color: #e2e8f0; font-weight: 500; }
+  .stock-item-code { font-size: 12px; color: #64748b; font-family: monospace; }
+  .stock-item-market {
+    font-size: 10px; padding: 2px 6px; border-radius: 4px;
+    background: rgba(59,130,246,0.15); color: #3b82f6;
+    margin-left: auto;
+  }
+  .stock-selected {
+    font-size: 11px; color: #10b981;
+    margin-top: 4px; padding-left: 4px;
+    display: none; font-family: monospace;
+  }
+  .searching-indicator {
+    padding: 10px 16px; font-size: 13px;
+    color: #64748b; font-style: italic;
+  }
+
   /* 실시간 뉴스 섹션 */
   .news-section {
     margin-top: 1rem;
@@ -499,8 +542,13 @@
   <div class="panel" id="panel-analyze">
 
     <div class="form-section">
-      <label class="form-label">종목명 또는 티커</label>
-      <input type="text" id="a-stock" placeholder="예: 삼성전자, 005930, NVDA, AAPL">
+      <label class="form-label">종목명 검색</label>
+      <div class="stock-wrap">
+        <input type="text" id="a-stock" placeholder="종목명 입력 (예: 삼성전자, OCI, SK하이닉스...)" autocomplete="off" oninput="searchStock(this.value)">
+        <div class="stock-dropdown" id="stock-dropdown"></div>
+      </div>
+      <div class="stock-selected" id="stock-selected">✅ <span id="selected-info"></span></div>
+      <input type="hidden" id="a-stock-code" value="">
     </div>
 
     <div class="form-section">
@@ -566,6 +614,94 @@
 
 <script>
   // API 키 저장/불러오기
+  // 종목 자동검색
+  let searchTimer = null;
+  let selectedStock = null;
+
+  async function searchStock(query) {
+    const dropdown = document.getElementById('stock-dropdown');
+    const selectedDiv = document.getElementById('stock-selected');
+
+    // 선택 초기화
+    document.getElementById('a-stock-code').value = '';
+    selectedDiv.style.display = 'none';
+    selectedStock = null;
+
+    if (!query || query.length < 1) {
+      dropdown.classList.remove('open');
+      return;
+    }
+
+    // 숫자 6자리면 코드 직접 입력
+    if (/^\d{6}$/.test(query)) {
+      dropdown.innerHTML = `<div class="stock-item" onclick="selectStock('${query}', '${query}', '직접입력')">
+        <span class="stock-item-name">${query}</span>
+        <span class="stock-item-code">${query}</span>
+        <span class="stock-item-market">직접입력</span>
+      </div>`;
+      dropdown.classList.add('open');
+      return;
+    }
+
+    // 디바운스 300ms
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(async () => {
+      dropdown.innerHTML = '<div class="searching-indicator">🔍 검색 중...</div>';
+      dropdown.classList.add('open');
+
+      try {
+        // DART API로 종목 검색
+        const res = await fetch(
+          `https://opendart.fss.or.kr/api/company.json?crtfc_key=9990b7d8e15e4291eb86783c4fb01630e7223cee&corp_name=${encodeURIComponent(query)}&page_no=1&page_count=10`
+        );
+        const data = await res.json();
+
+        if (!data.list || data.list.length === 0) {
+          dropdown.innerHTML = '<div class="searching-indicator">검색 결과 없음</div>';
+          return;
+        }
+
+        // 상장사만 필터링 (stock_code 있는 것)
+        const listed = data.list.filter(c => c.stock_code && c.stock_code.trim());
+
+        if (listed.length === 0) {
+          dropdown.innerHTML = '<div class="searching-indicator">상장된 종목 없음</div>';
+          return;
+        }
+
+        dropdown.innerHTML = listed.slice(0, 8).map(corp => {
+          const market = corp.corp_cls === 'Y' ? '코스피' : corp.corp_cls === 'K' ? '코스닥' : '기타';
+          const code = corp.stock_code.trim();
+          return `<div class="stock-item" onclick="selectStock('${corp.corp_name}', '${code}', '${market}')">
+            <span class="stock-item-name">${corp.corp_name}</span>
+            <span class="stock-item-code">${code}</span>
+            <span class="stock-item-market">${market}</span>
+          </div>`;
+        }).join('');
+
+        dropdown.classList.add('open');
+      } catch(e) {
+        dropdown.innerHTML = '<div class="searching-indicator">검색 실패 — 종목코드 직접 입력해보세요</div>';
+      }
+    }, 300);
+  }
+
+  function selectStock(name, code, market) {
+    document.getElementById('a-stock').value = name;
+    document.getElementById('a-stock-code').value = code;
+    document.getElementById('stock-dropdown').classList.remove('open');
+    document.getElementById('selected-info').textContent = `${name} (${code}) — ${market}`;
+    document.getElementById('stock-selected').style.display = 'block';
+    selectedStock = { name, code, market };
+  }
+
+  // 드롭다운 외부 클릭 시 닫기
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.stock-wrap')) {
+      document.getElementById('stock-dropdown').classList.remove('open');
+    }
+  });
+
   window.onload = function() {
     const saved = localStorage.getItem('anthropic_api_key');
     if (saved) {
@@ -664,6 +800,7 @@ ${extra ? `- 추가 조건: ${extra}` : ''}
   // 매수/매도 판단 실행
   async function runAnalyze() {
     const stock  = document.getElementById('a-stock').value.trim();
+    const stockCode = document.getElementById('a-stock-code').value.trim();
     if (!stock) { alert('종목명을 입력해주세요.'); return; }
 
     const view   = getSelected('view-tags');
@@ -699,6 +836,7 @@ ${extra ? `- 추가 조건: ${extra}` : ''}
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           stockName: stock,
+          stockCode: stockCode,
           mode: 'analyze',
           messages: [{ role: 'user', content: prompt }]
         })
