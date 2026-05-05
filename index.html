@@ -549,6 +549,7 @@
       </div>
       <div class="stock-selected" id="stock-selected">✅ <span id="selected-info"></span></div>
       <input type="hidden" id="a-stock-code" value="">
+      <input type="hidden" id="a-stock-market" value="">
     </div>
 
     <div class="form-section">
@@ -679,6 +680,7 @@
   function selectStock(name, code, market) {
     document.getElementById('a-stock').value = name;
     document.getElementById('a-stock-code').value = code;
+    document.getElementById('a-stock-market').value = market;
     document.getElementById('stock-dropdown').classList.remove('open');
     document.getElementById('selected-info').textContent = `${name} (${code}) — ${market}`;
     document.getElementById('stock-selected').style.display = 'block';
@@ -827,6 +829,7 @@ ${extra ? `- 추가 조건: ${extra}` : ''}
         body: JSON.stringify({
           stockName: stock,
           stockCode: stockCode,
+          stockMarket: document.getElementById('a-stock-market').value,
           mode: 'analyze',
           messages: [{ role: 'user', content: prompt }]
         })
