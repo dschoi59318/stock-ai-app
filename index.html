@@ -625,7 +625,7 @@ ${extra ? `- 추가 조건: ${extra}` : ''}
 - 투자 기간: ${period}
 매수/매도/홀드 판단을 명확히 제시하고 근거를 설명해주세요.`;
 
-    await run('a', prompt, `${stock} 종목을 분석하고 있습니다...`, 'AI 매수/매도 판단 받기');
+    await run('a', prompt, `${stock} 종목을 분석하고 있습니다...`, 'AI 매수/매도 판단 받기', stock, 'analyze');
   }
 
   // 결과 복사
@@ -688,7 +688,7 @@ ${extra ? `- 추가 조건: ${extra}` : ''}
   }
 
   // 공통 실행
-  async function run(id, prompt, loadingMsg, btnLabel) {
+  async function run(id, prompt, loadingMsg, btnLabel, stockName='', mode='recommend') {
     const btn  = document.getElementById(`btn-${id}`);
     const wrap = document.getElementById(`wrap-${id}`);
     const box  = document.getElementById(`box-${id}`);
@@ -700,9 +700,14 @@ ${extra ? `- 추가 조건: ${extra}` : ''}
     box.textContent = loadingMsg;
 
     try {
-      const result = await callClaude(prompt);
+      const result = await callClaude(prompt, stockName, mode);
       box.className = 'result-box';
-      box.textContent = result;
+      const text = typeof result === 'object' ? result.text : result;
+      const dartUsed = typeof result === 'object' ? result.dartUsed : false;
+      const badge = dartUsed
+        ? '<div style="font-size:11px;color:#10b981;margin-bottom:8px;font-family:monospace;">📊 DART 실시간 공시 데이터 반영</div>'
+        : (mode === 'analyze' ? '<div style="font-size:11px;color:#64748b;margin-bottom:8px;font-family:monospace;">📚 AI 학습 데이터 기반 분석</div>' : '');
+      box.innerHTML = badge + '<pre style="white-space:pre-wrap;font-family:inherit;margin:0;">' + text + '</pre>';
     } catch(e) {
       box.className = 'result-box error';
       box.textContent = '오류: ' + e.message;
